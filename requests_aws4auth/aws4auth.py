@@ -16,6 +16,7 @@ import posixpath
 import re
 import shlex
 import datetime
+from email.utils import parsedate_to_datetime
 
 try:
     from urllib.parse import urlparse, parse_qs, quote, unquote
@@ -577,13 +578,20 @@ class AWS4Auth(AuthBase):
         """
         Generate the AWS4 auth string to sign for the request.
 
+        Checks to see if date has been passed as x-amz-date or date, if
+        date then parse the date from a date string.
+
         req      -- Requests PreparedRequest object. This should already
-                    include an x-amz-date header.
+                    include an x-amz-date or a date header.
         cano_req -- The Canonical Request, as returned by
                     get_canonical_request()
 
         """
-        amz_date = req.headers['x-amz-date']
+        if 'x-amz-date' in req.headers:
+            amz_date = req.headers['x-amz-date']
+        elif 'date' in req.headers:
+            amz_date = parsedate_to_datetime(req.headers['date']).strftime(
+                '%Y%m%dT%H%M%SZ')
         hsh = hashlib.sha256(cano_req.encode())
         sig_items = ['AWS4-HMAC-SHA256', amz_date, scope, hsh.hexdigest()]
         sig_string = '\n'.join(sig_items)
